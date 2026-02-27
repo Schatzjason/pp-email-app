@@ -4,6 +4,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request
+from flask_login import LoginManager, UserMixin
 from flask_sqlalchemy import SQLAlchemy
 
 load_dotenv()
@@ -14,6 +15,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
 db = SQLAlchemy(app)
+
+login_manager = LoginManager(app)
 
 # ---------------------------------------------------------------------------
 # Hardcoded parent list
@@ -84,7 +87,7 @@ CHARGE_PARENTS = [
 
 ADMIN = [
     {"name": "Elizabeth Blevins", "email": "eblevins@madeup.com"},
-    {"name": "Jason Schatz", "email": "jschatz@madeup.com"},
+    {"name": "Jason Schatz", "email": "jschatz@fakemail.com"},
     {"name": "Chelsea Royaltea", "email": "croyaltea@madeup.com"},
 ]
 
@@ -92,8 +95,26 @@ PARENT_NAMES = [p["name"] for p in PARENTS]
 
 
 # ---------------------------------------------------------------------------
-# Model
+# Models
 # ---------------------------------------------------------------------------
+
+
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+
+    email = db.Column(db.String(255), primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    is_parent = db.Column(db.Boolean, nullable=False, default=False)
+    is_charge_parent = db.Column(db.Boolean, nullable=False, default=False)
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
+
+    def get_id(self):
+        return self.email
+
+
+@login_manager.user_loader
+def load_user(email):
+    return db.session.get(User, email)
 
 
 class SubstitutionRequest(db.Model):
