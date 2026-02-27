@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Substitution Report — Peter Pan Coop{% endblock %}
+
+{% block content %}
+<h2>Substitution Request History</h2>
+
+{# ── Filter form ── #}
+<div class="card" style="padding: 1.25rem 2rem;">
+  <form method="get" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
+    <div style="flex:1; min-width:140px;">
+      <label for="from_date" style="margin-bottom:0.3rem;">From date</label>
+      <input type="date" id="from_date" name="from_date" value="{{ from_date }}" style="margin-bottom:0;" />
+    </div>
+    <div style="flex:1; min-width:140px;">
+      <label for="to_date" style="margin-bottom:0.3rem;">To date</label>
+      <input type="date" id="to_date" name="to_date" value="{{ to_date }}" style="margin-bottom:0;" />
+    </div>
+    <div style="flex:2; min-width:180px;">
+      <label for="name" style="margin-bottom:0.3rem;">Parent name</label>
+      <input type="text" id="name" name="name" value="{{ name_search }}" placeholder="Search by name…" style="margin-bottom:0;" />
+    </div>
+    <div style="display:flex; gap:0.5rem; padding-bottom:1px;">
+      <button type="submit" class="btn btn-primary">Filter</button>
+      {% if from_date or to_date or name_search %}
+        <a href="/report" class="btn" style="background:#e8e8e8; color:#444;">Clear</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{# ── Results ── #}
+{% if subs %}
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+      <thead>
+        <tr style="background:#f0f5f1; border-bottom:2px solid #d4e6d9;">
+          <th style="padding:0.75rem 1rem; text-align:left; font-weight:700; color:#3b6347;">Shift Date</th>
+          <th style="padding:0.75rem 1rem; text-align:left; font-weight:700; color:#3b6347;">Requested By</th>
+          <th style="padding:0.75rem 1rem; text-align:left; font-weight:700; color:#3b6347;">Accepted By</th>
+          <th style="padding:0.75rem 1rem; text-align:left; font-weight:700; color:#3b6347;">Reason</th>
+          <th style="padding:0.75rem 1rem; text-align:left; font-weight:700; color:#3b6347;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sub in subs %}
+          <tr style="border-bottom:1px solid #eee; {% if loop.index is even %}background:#fafafa;{% endif %}">
+            <td style="padding:0.7rem 1rem; white-space:nowrap;">
+              {{ sub.shift_date.strftime("%b %d, %Y") }}
+            </td>
+            <td style="padding:0.7rem 1rem;">{{ sub.requesting_parent_name }}</td>
+            <td style="padding:0.7rem 1rem;">
+              {% if sub.accepting_parent_name %}
+                {{ sub.accepting_parent_name }}
+              {% else %}
+                <em style="color:#999;">Unfilled</em>
+              {% endif %}
+            </td>
+            <td style="padding:0.7rem 1rem; color:#555;">{{ sub.reason }}</td>
+            <td style="padding:0.7rem 1rem;">
+              {% if sub.status == "filled" %}
+                <span style="background:#d4edda; color:#1a5c2e; padding:0.2rem 0.55rem; border-radius:12px; font-size:0.8rem; font-weight:600;">Filled</span>
+              {% else %}
+                <span style="background:#fff3cd; color:#856404; padding:0.2rem 0.55rem; border-radius:12px; font-size:0.8rem; font-weight:600;">Open</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:0.85rem; color:#888; margin-top:0.5rem;">{{ subs|length }} record{{ 's' if subs|length != 1 }} found</p>
+{% else %}
+  <div class="alert alert-info">No substitution requests found{% if from_date or to_date or name_search %} matching your filters{% endif %}.</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Request a Substitute — Peter Pan Coop{% endblock %}
+
+{% block content %}
+<h2>Request a Work-Shift Substitute</h2>
+
+{% if success %}
+  <div class="alert alert-success">
+    <strong>Request submitted!</strong> Emails have been sent to all parents with a link to accept the shift on
+    <strong>{{ shift_date.strftime("%A, %B %d, %Y") }}</strong>.
+    The first parent to confirm will be recorded as your substitute.
+  </div>
+{% endif %}
+
+{% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <form method="post">
+    <label for="name">Your name</label>
+    <select id="name" name="name" required>
+      <option value="">— select your name —</option>
+      {% for parent in parents %}
+        <option value="{{ parent }}"
+          {% if form and form.get('name') == parent %}selected{% endif %}>
+          {{ parent }}
+        </option>
+      {% endfor %}
+    </select>
+
+    <label for="shift_date">Date you can't work</label>
+    <input
+      type="date"
+      id="shift_date"
+      name="shift_date"
+      required
+      value="{{ form.get('shift_date', '') if form else '' }}"
+    />
+
+    <label for="reason">Reason for absence</label>
+    <textarea id="reason" name="reason" placeholder="e.g. doctor's appointment, family commitment…" required>{{ form.get('reason', '') if form else '' }}</textarea>
+
+    <button type="submit" class="btn btn-primary">Send substitution request</button>
+  </form>
+</div>
+{% endblock %}
