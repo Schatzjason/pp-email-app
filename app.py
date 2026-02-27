@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime
 
@@ -8,9 +9,9 @@ from flask_sqlalchemy import SQLAlchemy
 load_dotenv()
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///substitutions.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"] = "dev-secret-key"
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
 db = SQLAlchemy(app)
 
@@ -37,7 +38,7 @@ PARENTS = [
     {"name": "Domingo Benitez", "email": "dbenitez@fakemail.com"},
     {"name": "Drew Zanchez", "email": "dzanchez@zmail.com"},
     {"name": "Drew Znyder", "email": "dznyder@fakemail.com"},
-    {"name": "Elizabeth Blevinz", "email": "eblevins@madeup.com"},
+    {"name": "Elizabeth Blevins", "email": "eblevins@madeup.com"},
     {"name": "Elizabeth Ozborne", "email": "eozborne@fakemail.com"},
     {"name": "Gwyn Waller", "email": "gwaller@madeup.com"},
     {"name": "James Monacho", "email": "jmonacho@madeup.com"},
@@ -79,6 +80,12 @@ CHARGE_PARENTS = [
     {"name": "James Monacho", "email": "jmonacho@madeup.com"},
     {"name": "Katy Wayde", "email": "kwayde@fakemail.com"},
     {"name": "San La", "email": "sla@fakemail.com"},
+]
+
+ADMIN = [
+    {"name": "Elizabeth Blevins", "email": "eblevins@madeup.com"},
+    {"name": "Jason Schatz", "email": "jschatz@madeup.com"},
+    {"name": "Chelsea Royaltea", "email": "croyaltea@madeup.com"},
 ]
 
 PARENT_NAMES = [p["name"] for p in PARENTS]
