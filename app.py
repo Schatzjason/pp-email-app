@@ -1,10 +1,10 @@
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request
-from flask_login import LoginManager, UserMixin
+from flask import Flask, flash, redirect, render_template, request, url_for
+from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 
 load_dotenv()
@@ -17,6 +17,7 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 db = SQLAlchemy(app)
 
 login_manager = LoginManager(app)
+login_manager.login_view = "auth_login"
 
 # ---------------------------------------------------------------------------
 # Hardcoded parent list
@@ -117,6 +118,16 @@ def load_user(email):
     return db.session.get(User, email)
 
 
+class MagicLinkToken(db.Model):
+    __tablename__ = "magic_link_tokens"
+
+    token = db.Column(db.String(36), primary_key=True)
+    email = db.Column(db.String(255), db.ForeignKey("users.email"), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, nullable=False, default=False)
+    remember = db.Column(db.Boolean, nullable=False, default=False)
+
+
 class SubstitutionRequest(db.Model):
     __tablename__ = "substitution_requests"
 
@@ -136,6 +147,28 @@ class SubstitutionRequest(db.Model):
 # ---------------------------------------------------------------------------
 
 SEP = "=" * 64
+
+
+def send_magic_link_email(email: str, name: str, magic_url: str) -> None:
+    print(f"\n{SEP}")
+    print("  SIMULATED EMAIL — Magic Link Login")
+    print(SEP)
+    print(f"\nTO:      {name} <{email}>")
+    print(f"SUBJECT: Your Peter Pan Coop login link")
+    print(f"BODY:")
+    print(f"  Hi {name},")
+    print()
+    print(f"  Click the link below to log in to the Peter Pan Coop Preschool")
+    print(f"  substitution system. This link expires in 15 minutes and can")
+    print(f"  only be used once.")
+    print()
+    print(f"  {magic_url}")
+    print()
+    print(f"  If you didn't request this link, you can safely ignore this email.")
+    print()
+    print(f"  Thank you,")
+    print(f"  Peter Pan Coop Preschool")
+    print(f"\n{SEP}\n")
 
 
 def send_substitution_email(sub: SubstitutionRequest, base_url: str) -> None:
@@ -173,11 +206,83 @@ def send_substitution_email(sub: SubstitutionRequest, base_url: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+
+
+@app.route("/auth/login", methods=["GET", "POST"])
+def auth_login():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        remember = bool(request.form.get("remember"))
+
+        user = db.session.get(User, email)
+        if user:
+            token_str = str(uuid.uuid4())
+            magic_token = MagicLinkToken(
+                token=token_str,
+                email=email,
+                expires_at=datetime.utcnow() + timedelta(minutes=15),
+                remember=remember,
+            )
+            db.session.add(magic_token)
+            db.session.commit()
+
+            magic_url = url_for("auth_verify", token=token_str, _external=True)
+            send_magic_link_email(email, user.name, magic_url)
+
+        # Always show the same message — don't leak whether the email exists
+        return render_template("auth/login.html", sent=True, email=email)
+
+    return render_template("auth/login.html")
+
+
+@app.route("/auth/verify/<token>")
+def auth_verify(token):
+    magic_token = db.session.get(MagicLinkToken, token)
+
+    if magic_token is None:
+        flash("Invalid login link.", "error")
+        return redirect(url_for("auth_login"))
+
+    if magic_token.used:
+        flash("This login link has already been used. Please request a new one.", "error")
+        return redirect(url_for("auth_login"))
+
+    if datetime.utcnow() > magic_token.expires_at:
+        flash("This login link has expired. Please request a new one.", "error")
+        return redirect(url_for("auth_login"))
+
+    magic_token.used = True
+    db.session.commit()
+
+    user = db.session.get(User, magic_token.email)
+    login_user(user, remember=magic_token.remember)
+
+    next_url = request.args.get("next", "")
+    # Guard against open-redirect: only allow relative paths
+    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+        return redirect(next_url)
+    return redirect(url_for("index"))
+
+
+@app.route("/auth/logout")
+@login_required
+def auth_logout():
+    logout_user()
+    return redirect(url_for("auth_login"))
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 
 @app.route("/", methods=["GET", "POST"])
+@login_required
 def index():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -226,6 +331,7 @@ def index():
 
 
 @app.route("/accept/<token>", methods=["GET", "POST"])
+@login_required
 def accept(token):
     sub = SubstitutionRequest.query.filter_by(token=token).first_or_404()
 
@@ -266,6 +372,7 @@ def accept(token):
 
 
 @app.route("/report")
+@login_required
 def report():
     from_date_str = request.args.get("from_date", "")
     to_date_str = request.args.get("to_date", "")

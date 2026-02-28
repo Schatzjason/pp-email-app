@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Log In — Peter Pan Coop{% endblock %}
+
+{% block content %}
+<h2>Log In</h2>
+
+{% if sent %}
+  <div class="alert alert-success">
+    If <strong>{{ email }}</strong> is in our system, a login link has been sent.
+    Check your email and click the link — it expires in 15 minutes.
+  </div>
+  <p style="font-size:0.9rem; color:#666;">
+    Didn't get it? <a href="/auth/login" style="color:#4a7c59;">Request another link.</a>
+  </p>
+{% else %}
+  <div class="card">
+    <p style="margin-bottom:1.4rem; font-size:0.95rem; color:#555;">
+      Enter your email address and we'll send you a one-time login link.
+    </p>
+
+    <form method="post">
+      <label for="email">Email address</label>
+      <input
+        type="email"
+        id="email"
+        name="email"
+        placeholder="you@example.com"
+        required
+        autofocus
+      />
+
+      <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1.4rem;">
+        <input
+          type="checkbox"
+          id="remember"
+          name="remember"
+          style="width:auto; margin-bottom:0;"
+        />
+        <label for="remember" style="font-weight:400; margin-bottom:0; cursor:pointer;">
+          Remember me on this device
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Send login link</button>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}
