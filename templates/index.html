@@ -23,7 +23,9 @@
       <option value="">— select your name —</option>
       {% for parent in parents %}
         <option value="{{ parent }}"
-          {% if form and form.get('name') == parent %}selected{% endif %}>
+          {% if form and form.get('name') == parent %}selected
+          {% elif not form and current_user.name == parent %}selected
+          {% endif %}>
           {{ parent }}
         </option>
       {% endfor %}
