@@ -2,8 +2,10 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
+from functools import wraps
+
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 
@@ -108,6 +110,7 @@ class User(UserMixin, db.Model):
     is_parent = db.Column(db.Boolean, nullable=False, default=False)
     is_charge_parent = db.Column(db.Boolean, nullable=False, default=False)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
 
     def get_id(self):
         return self.email
@@ -221,6 +224,9 @@ def auth_login():
 
         user = db.session.get(User, email)
         if user:
+            if not user.is_active:
+                return render_template("auth/login.html", inactive=True)
+
             token_str = str(uuid.uuid4())
             magic_token = MagicLinkToken(
                 token=token_str,
@@ -411,6 +417,127 @@ def report():
         to_date=to_date_str,
         name_search=name_search,
     )
+
+
+# ---------------------------------------------------------------------------
+# Admin
+# ---------------------------------------------------------------------------
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return login_manager.unauthorized()
+        if not current_user.is_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    users = User.query.order_by(User.name).all()
+    return render_template("admin/users.html", users=users)
+
+
+@app.route("/admin/users/new", methods=["GET", "POST"])
+@admin_required
+def admin_user_new():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        name = request.form.get("name", "").strip()
+
+        if not email or not name:
+            return render_template("admin/user_form.html", is_new=True, error="Name and email are required.", form=request.form)
+
+        if db.session.get(User, email):
+            return render_template("admin/user_form.html", is_new=True, error="A user with that email already exists.", form=request.form)
+
+        user = User(
+            email=email,
+            name=name,
+            is_parent=bool(request.form.get("is_parent")),
+            is_charge_parent=bool(request.form.get("is_charge_parent")),
+            is_admin=bool(request.form.get("is_admin")),
+            is_active=bool(request.form.get("is_active")),
+        )
+        db.session.add(user)
+        db.session.commit()
+        return redirect(url_for("admin_users"))
+
+    return render_template("admin/user_form.html", is_new=True)
+
+
+@app.route("/admin/users/<path:email>", methods=["GET", "POST"])
+@admin_required
+def admin_user_edit(email):
+    user = db.session.get(User, email)
+    if user is None:
+        abort(404)
+
+    if request.method == "POST":
+        new_email = request.form.get("email", "").strip().lower()
+        name = request.form.get("name", "").strip()
+
+        if not new_email or not name:
+            return render_template("admin/user_form.html", is_new=False, user=user, error="Name and email are required.", form=request.form)
+
+        if new_email != email and db.session.get(User, new_email):
+            return render_template("admin/user_form.html", is_new=False, user=user, error="A user with that email already exists.", form=request.form)
+
+        if new_email != email:
+            # Remove token records referencing the old PK before changing it
+            MagicLinkToken.query.filter_by(email=email).delete()
+            db.session.flush()
+
+        user.name = name
+        user.is_parent = bool(request.form.get("is_parent"))
+        user.is_charge_parent = bool(request.form.get("is_charge_parent"))
+        user.is_admin = bool(request.form.get("is_admin"))
+        user.is_active = bool(request.form.get("is_active"))
+        user.email = new_email
+        db.session.commit()
+        return redirect(url_for("admin_users"))
+
+    return render_template("admin/user_form.html", is_new=False, user=user)
+
+
+_TOGGLEABLE_FIELDS = {"is_parent", "is_charge_parent", "is_admin", "is_active"}
+
+
+@app.route("/admin/users/<path:email>/toggle/<field>", methods=["POST"])
+@admin_required
+def admin_user_toggle(email, field):
+    if field not in _TOGGLEABLE_FIELDS:
+        abort(400)
+
+    user = db.session.get(User, email)
+    if user is None:
+        abort(404)
+
+    new_value = not getattr(user, field)
+    setattr(user, field, new_value)
+    db.session.commit()
+
+    return {"value": new_value}
+
+
+@app.route("/admin/users/<path:email>/delete", methods=["POST"])
+@admin_required
+def admin_user_delete(email):
+    if email == current_user.email:
+        abort(403)
+
+    user = db.session.get(User, email)
+    if user is None:
+        abort(404)
+
+    MagicLinkToken.query.filter_by(email=email).delete()
+    db.session.delete(user)
+    db.session.commit()
+    return redirect(url_for("admin_users"))
 
 
 # ---------------------------------------------------------------------------

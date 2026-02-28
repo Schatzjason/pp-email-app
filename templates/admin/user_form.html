@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Add User' if is_new else 'Edit User' }} — Admin — Peter Pan Coop{% endblock %}
+
+{% block content %}
+<h2>{{ 'Add User' if is_new else 'Edit User' }}</h2>
+
+{% if error %}
+  <div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{#
+  Value resolution order for each field:
+    1. form dict (POST with validation error — re-populate what the user typed)
+    2. user object (GET edit page — pre-populate from DB)
+    3. sensible default (GET new page)
+#}
+{% set v_email          = form.get('email')           if form else (user.email           if user else '') %}
+{% set v_name           = form.get('name')            if form else (user.name            if user else '') %}
+{% set v_is_parent      = form.get('is_parent')       if form else (user.is_parent       if user else false) %}
+{% set v_is_charge      = form.get('is_charge_parent') if form else (user.is_charge_parent if user else false) %}
+{% set v_is_admin       = form.get('is_admin')        if form else (user.is_admin        if user else false) %}
+{% set v_is_active      = form.get('is_active')       if form else (user.is_active       if user else true) %}
+
+<div class="card">
+  <form method="post" action="{{ url_for('admin_user_new') if is_new else url_for('admin_user_edit', email=user.email) }}">
+
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" value="{{ v_name }}" required autofocus />
+
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" value="{{ v_email }}" required />
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem 2rem; margin-bottom:1.4rem;">
+      {% for field, label, checked in [
+          ('is_parent',       'Parent',        v_is_parent),
+          ('is_charge_parent','Charge parent', v_is_charge),
+          ('is_admin',        'Admin',         v_is_admin),
+          ('is_active',       'Active',        v_is_active),
+      ] %}
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <input
+            type="checkbox"
+            id="{{ field }}"
+            name="{{ field }}"
+            {% if checked %}checked{% endif %}
+            style="width:auto; margin-bottom:0;"
+          />
+          <label for="{{ field }}" style="font-weight:400; margin-bottom:0; cursor:pointer;">{{ label }}</label>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div style="display:flex; gap:0.75rem; align-items:center;">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="{{ url_for('admin_users') }}" class="btn" style="background:#e8e8e8; color:#444;">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% if not is_new %}
+  <div class="card" style="border-color:#f5c6c6;">
+    <p style="font-size:0.9rem; color:#555; margin-bottom:1rem;">
+      <strong>Danger zone</strong> — deleting a user is permanent and cannot be undone.
+      {% if user.email == current_user.email %}
+        You cannot delete your own account.
+      {% endif %}
+    </p>
+    {% if user.email != current_user.email %}
+      <form method="post" action="{{ url_for('admin_user_delete', email=user.email) }}"
+            onsubmit="return confirm('Permanently delete {{ user.name }}? This cannot be undone.')">
+        <button type="submit" class="btn" style="background:#c0392b; color:#fff;">Delete user</button>
+      </form>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

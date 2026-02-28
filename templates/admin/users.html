@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Users — Admin — Peter Pan Coop{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:1.5rem;">
+  <h2 style="margin-bottom:0;">Users</h2>
+  <a href="{{ url_for('admin_user_new') }}" class="btn btn-primary">+ Add user</a>
+</div>
+
+<style>
+  .toggle-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.2rem 0.5rem;
+    min-width: 2rem;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .toggle-btn:hover:not(:disabled) {
+    background: #e8f0ea;
+    border-color: #b7d9c0;
+  }
+  .toggle-btn:disabled { opacity: 0.4; cursor: wait; }
+  .toggle-btn.is-true  { color: #1a5c2e; }
+  .toggle-btn.is-false { color: #bbb; }
+  /* Active column gets stronger red when false */
+  .toggle-btn[data-field="is_active"].is-false { color: #8b1a1a; }
+</style>
+
+{% if users %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+      <thead>
+        <tr style="background:#f0f5f1; border-bottom:2px solid #d4e6d9;">
+          <th style="padding:0.75rem 1rem; text-align:left; color:#3b6347;">Name</th>
+          <th style="padding:0.75rem 1rem; text-align:left; color:#3b6347;">Email</th>
+          <th style="padding:0.75rem 1rem; text-align:center; color:#3b6347;">Parent</th>
+          <th style="padding:0.75rem 1rem; text-align:center; color:#3b6347;">Charge</th>
+          <th style="padding:0.75rem 1rem; text-align:center; color:#3b6347;">Admin</th>
+          <th style="padding:0.75rem 1rem; text-align:center; color:#3b6347;">Active</th>
+          <th style="padding:0.75rem 1rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          <tr style="border-bottom:1px solid #eee; {% if loop.index is even %}background:#fafafa;{% endif %}">
+            <td style="padding:0.65rem 1rem; font-weight:500;">{{ user.name }}</td>
+            <td style="padding:0.65rem 1rem; color:#555;">{{ user.email }}</td>
+
+            {% for field, value in [
+                ('is_parent',       user.is_parent),
+                ('is_charge_parent',user.is_charge_parent),
+                ('is_admin',        user.is_admin),
+                ('is_active',       user.is_active),
+            ] %}
+              <td style="padding:0.65rem 1rem; text-align:center;">
+                <button
+                  class="toggle-btn {{ 'is-true' if value else 'is-false' }}"
+                  data-email="{{ user.email }}"
+                  data-field="{{ field }}"
+                  title="Click to toggle {{ field.replace('_', ' ') }}"
+                >{{ '✓' if value else '—' }}</button>
+              </td>
+            {% endfor %}
+
+            <td style="padding:0.65rem 1rem; text-align:right;">
+              <a href="{{ url_for('admin_user_edit', email=user.email) }}" class="btn" style="background:#e8e8e8; color:#444; padding:0.35rem 0.8rem; font-size:0.85rem;">Edit</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:0.85rem; color:#888; margin-top:0.5rem;">{{ users|length }} user{{ 's' if users|length != 1 }}</p>
+{% else %}
+  <div class="alert alert-info">No users yet. <a href="{{ url_for('admin_user_new') }}">Add one.</a></div>
+{% endif %}
+
+<script>
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const email = btn.dataset.email;
+      const field = btn.dataset.field;
+
+      btn.disabled = true;
+      try {
+        const resp = await fetch(
+          `/admin/users/${encodeURIComponent(email)}/toggle/${field}`,
+          { method: 'POST' }
+        );
+        if (!resp.ok) throw new Error(resp.status);
+
+        const { value } = await resp.json();
+        btn.textContent = value ? '✓' : '—';
+        btn.className = `toggle-btn ${value ? 'is-true' : 'is-false'}`;
+      } catch {
+        alert('Could not save change. Please try again.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+</script>
+{% endblock %}

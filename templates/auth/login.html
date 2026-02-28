@@ -4,7 +4,14 @@
 {% block content %}
 <h2>Log In</h2>
 
-{% if sent %}
+{% if inactive %}
+  <div class="alert alert-error">
+    This account is inactive. Please contact a school administrator for help.
+  </div>
+  <p style="font-size:0.9rem; color:#666;">
+    <a href="/auth/login" style="color:#4a7c59;">Back to login.</a>
+  </p>
+{% elif sent %}
   <div class="alert alert-success">
     If <strong>{{ email }}</strong> is in our system, a login link has been sent.
     Check your email and click the link — it expires in 15 minutes.
